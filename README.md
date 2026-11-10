@@ -2,7 +2,9 @@
 
 A floating robot chat widget you can drop into **any website** with one line of code, powered by Google Gemini.
 
-- `server.js` — tiny Node server (no dependencies). Serves the demo page + widget and proxies chat to Gemini so your API key stays secret.
+- `lib/chat.js` — the chat logic: sends messages to Gemini so your API key stays secret on the server.
+- `server.js` — tiny Node server (no dependencies) for local use, Render, Railway, Docker or a VPS.
+- `netlify/functions/chat.mjs` + `netlify.toml` — the same chat API as a Netlify Function.
 - `public/widget.js` — the embeddable widget (robot button bottom-right → chat popup).
 - `public/index.html` — the live demo page.
 
@@ -56,6 +58,10 @@ You can also open/close it from your own buttons: `GeminiChat.open()` / `GeminiC
 ## Deploy
 
 It's a plain Node app with no build step and no dependencies, so it runs anywhere:
+
+- **Netlify:** import the GitHub repo. `netlify.toml` already sets everything up (no build command needed).
+  Then go to **Site configuration → Environment variables**, add `GEMINI_API_KEY`, and redeploy
+  (**Deploys → Trigger deploy → Deploy site**).
 
 - **Render / Railway / Fly.io / Heroku:** connect the folder/repo, start command `npm start`, add `GEMINI_API_KEY` as an environment variable.
 - **Docker:**

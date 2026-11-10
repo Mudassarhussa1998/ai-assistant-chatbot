@@ -1,0 +1,11 @@
+# Netlify: serve the page + widget from public/, and the chat API from netlify/functions/.
+[build]
+  publish = "public"
+
+[functions]
+  directory = "netlify/functions"
+
+[[headers]]
+  for = "/widget.js"
+  [headers.values]
+    Access-Control-Allow-Origin = "*"
