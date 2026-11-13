@@ -1,0 +1,39 @@
+# Render Blueprint: creates the backend (FastAPI) and frontend (Next.js) services.
+# In Render: New → Blueprint → pick this repo. You'll be asked for the secret values.
+services:
+  - type: web
+    name: ai-assistant-backend
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        value: "*"
+      # Password for the admin panel (/admin). Render generates one; see it in the service's Environment tab.
+      - key: ADMIN_TOKEN
+        generateValue: true
+    # Documents uploaded in the admin panel are lost on every redeploy unless they live on a
+    # persistent disk (paid Render plans). To keep them, uncomment both blocks below:
+    # disk:
+    #   name: knowledge
+    #   mountPath: /var/data/knowledge
+    #   sizeGB: 1
+    # (and add this env var:)
+    #   - key: KNOWLEDGE_DIR
+    #     value: /var/data/knowledge
+
+  - type: web
+    name: ai-assistant-frontend
+    runtime: node
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    envVars:
+      # The backend's public URL, e.g. https://ai-assistant-backend.onrender.com
+      # Needed at build time: redeploy the frontend after changing it.
+      - key: BACKEND_URL
+        sync: false

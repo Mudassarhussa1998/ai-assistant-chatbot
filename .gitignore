@@ -1,3 +1,11 @@
-node_modules
-.env
 .DS_Store
+.env
+
+# Backend (Python)
+backend/.venv/
+backend/.env
+backend/knowledge/.index/
+__pycache__/
+
+# Frontend (Next.js) — see also frontend/.gitignore
+node_modules/

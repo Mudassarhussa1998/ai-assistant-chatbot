@@ -7,6 +7,7 @@
  *   data-color="#556b2f"                accent color (olive green by default)
  *   data-welcome="Hi! How can I help?"  intro text
  *   data-suggestions="A|B|C"            quick-reply chips, separated by |
+ *   data-show-sources="true"            show which documents an answer came from (hidden by default)
  *   data-api="https://YOUR-SERVER"      API base (defaults to where widget.js is served from)
  */
 (function () {
@@ -21,6 +22,7 @@
     welcome: script?.dataset.welcome || "Ask me anything — I'm here to help you 24/7.",
     suggestions: (script?.dataset.suggestions || "What can you do?|How can you help my business?|Give me a quick tip")
       .split("|").map((s) => s.trim()).filter(Boolean),
+    showSources: script?.dataset.showSources === "true",
     api: (script?.dataset.api || defaultApi()).replace(/\/$/, ""),
   };
 
@@ -53,6 +55,8 @@
     reset: `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>`,
     send: `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>`,
     arrow: `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`,
+    copy: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2.5"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>`,
+    check: `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg>`,
   };
 
   const CSS = `
@@ -60,7 +64,9 @@
     * { box-sizing: border-box; margin: 0; font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
     button { font: inherit; -webkit-tap-highlight-color: transparent; }
     .wrap {
-      --ink: #2b2d29; --muted: #6b6f68; --line: #e2e3df; --soft: #f1f2ef;
+      --ink: #1f211d; --muted: #6b6f68; --line: #e6e7e2; --soft: #f6f6f3;
+      --accent-dark: color-mix(in srgb, var(--accent) 72%, #000);
+      --accent-tint: color-mix(in srgb, var(--accent) 10%, #fff);
       --robot-face: var(--accent);
       --safe-b: env(safe-area-inset-bottom, 0px); --safe-t: env(safe-area-inset-top, 0px);
     }
@@ -69,18 +75,19 @@
     /* ---------- Launcher ---------- */
     .launcher {
       position: fixed; right: 24px; bottom: 24px; z-index: 2147483646;
-      width: 60px; height: 60px; border-radius: 50%; border: none; cursor: pointer;
-      background: var(--accent); color: #fff; display: grid; place-items: center;
-      box-shadow: 0 1px 2px rgba(0,0,0,.2), 0 10px 30px -4px rgba(0,0,0,.35);
+      width: 62px; height: 62px; border-radius: 50%; border: none; cursor: pointer;
+      background: linear-gradient(145deg, var(--accent), var(--accent-dark)); color: #fff; display: grid; place-items: center;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 2px 4px rgba(0,0,0,.15), 0 14px 34px -6px color-mix(in srgb, var(--accent) 70%, transparent);
       transition: transform .3s cubic-bezier(.34,1.56,.64,1), box-shadow .2s;
     }
-    .launcher:hover { transform: scale(1.07); }
+    .launcher:hover { transform: translateY(-2px) scale(1.05); }
     .launcher:active { transform: scale(.95); }
     .launcher::after {
       content: ""; position: absolute; inset: 0; border-radius: 50%;
       box-shadow: 0 0 0 0 var(--accent); opacity: .35; animation: pulse 2.6s ease-out infinite;
     }
     .launcher > span { grid-area: 1 / 1; display: grid; place-items: center; transition: transform .3s, opacity .2s; }
+    .launcher .robot { width: 30px; height: 30px; }
     .launcher .when-open { opacity: 0; transform: rotate(-90deg) scale(.6); }
     .open .launcher .when-closed { opacity: 0; transform: rotate(90deg) scale(.6); }
     .open .launcher .when-open { opacity: 1; transform: none; }
@@ -90,9 +97,9 @@
     @keyframes blink { 0%,92%,100% { transform: scaleY(1); } 95% { transform: scaleY(.1); } }
 
     .tooltip {
-      position: fixed; right: 96px; bottom: 37px; z-index: 2147483646;
-      background: #fff; color: var(--ink); font-size: 13.5px; font-weight: 500; padding: 9px 14px;
-      border-radius: 12px; box-shadow: 0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.12);
+      position: fixed; right: 98px; bottom: 36px; z-index: 2147483646;
+      background: #fff; color: var(--ink); font-size: 13.5px; font-weight: 500; padding: 10px 15px;
+      border-radius: 14px; box-shadow: 0 0 0 1px rgba(0,0,0,.04), 0 10px 30px -6px rgba(0,0,0,.18);
       white-space: nowrap; pointer-events: none; animation: tipIn .4s 1.5s both;
     }
     .tooltip::after {
@@ -104,10 +111,10 @@
 
     /* ---------- Panel ---------- */
     .panel {
-      position: fixed; right: 24px; bottom: 98px; z-index: 2147483647;
-      width: 400px; height: 640px; max-height: calc(100vh - 122px);
-      background: #fff; color: var(--ink); border-radius: 24px; overflow: hidden;
-      box-shadow: 0 0 0 1px rgba(0,0,0,.05), 0 4px 12px rgba(0,0,0,.06), 0 30px 80px -10px rgba(0,0,0,.3);
+      position: fixed; right: 24px; bottom: 100px; z-index: 2147483647;
+      width: 400px; height: 660px; max-height: calc(100vh - 124px);
+      background: var(--soft); color: var(--ink); border-radius: 26px; overflow: hidden;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.06), 0 4px 12px rgba(0,0,0,.06), 0 32px 80px -12px rgba(0,0,0,.32);
       display: flex; flex-direction: column;
       opacity: 0; visibility: hidden; transform: translateY(16px) scale(.96); transform-origin: bottom right;
       transition: opacity .2s ease, transform .3s cubic-bezier(.2,.9,.3,1), visibility 0s .3s;
@@ -115,109 +122,155 @@
     .open .panel { opacity: 1; visibility: visible; transform: none; transition: opacity .2s ease, transform .3s cubic-bezier(.2,.9,.3,1); }
 
     .header {
-      display: flex; align-items: center; gap: 12px; padding: 16px 14px 16px 18px;
+      position: relative; z-index: 1;
+      display: flex; align-items: center; gap: 12px; padding: 14px 12px 14px 16px;
       background: var(--accent); color: #fff;
-      background-image: linear-gradient(135deg, rgba(255,255,255,.1), rgba(255,255,255,0) 60%);
+      transition: box-shadow .2s;
     }
+    .scrolled .header { box-shadow: 0 6px 20px -8px rgba(0,0,0,.35); }
     .avatar {
-      position: relative; width: 40px; height: 40px; border-radius: 13px; background: #fff; color: var(--accent);
-      display: grid; place-items: center; flex-shrink: 0; --robot-face: #fff;
+      position: relative; width: 40px; height: 40px; border-radius: 13px; background: rgba(255,255,255,.16); color: #fff;
+      display: grid; place-items: center; flex-shrink: 0; --robot-face: var(--accent);
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
     }
     .avatar .robot { width: 25px; height: 25px; }
     .avatar .dot {
       position: absolute; right: -2px; bottom: -2px; width: 12px; height: 12px; border-radius: 50%;
-      background: #22c55e; border: 2.5px solid var(--accent);
+      background: #4ade80; border: 2.5px solid var(--accent);
     }
     .title { min-width: 0; flex: 1; }
     .title h3 { font-size: 15.5px; font-weight: 650; letter-spacing: -.01em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .title p { margin-top: 2px; font-size: 12.5px; color: rgba(255,255,255,.6); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .title p { margin-top: 2px; font-size: 12.5px; color: rgba(255,255,255,.7); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .icon-btn {
       width: 36px; height: 36px; border-radius: 11px; border: none; flex-shrink: 0;
       background: transparent; color: rgba(255,255,255,.85); cursor: pointer; display: grid; place-items: center;
       transition: background .15s, color .15s;
     }
-    .icon-btn:hover { background: rgba(255,255,255,.12); color: #fff; }
+    .icon-btn:hover { background: rgba(255,255,255,.14); color: #fff; }
 
     /* ---------- Messages ---------- */
     .messages {
-      position: relative; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 22px 18px 12px;
-      display: flex; flex-direction: column; gap: 14px; background: #fff;
+      position: relative; flex: 1; overflow-y: auto; overscroll-behavior: contain; padding: 0 16px 16px;
+      display: flex; flex-direction: column; gap: 14px; background: var(--soft);
     }
     .messages::-webkit-scrollbar { width: 6px; }
-    .messages::-webkit-scrollbar-thumb { background: #e4e4e7; border-radius: 3px; }
+    .messages::-webkit-scrollbar-thumb { background: #dcddd7; border-radius: 3px; }
 
-    .intro { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 10px 8px 6px; }
-    .intro .big {
-      width: 64px; height: 64px; border-radius: 20px; background: var(--accent); color: #fff;
-      display: grid; place-items: center; margin-bottom: 14px; --robot-face: var(--accent);
-      box-shadow: 0 10px 24px -8px rgba(0,0,0,.4);
+    /* Welcome band: continues the header color, with the suggestions card overlapping its edge. */
+    .intro {
+      position: relative; margin: 0 -16px; padding: 18px 24px 52px; color: #fff; overflow: hidden;
+      background: linear-gradient(180deg, var(--accent) 0%, var(--accent-dark) 100%);
     }
-    .intro .big .robot { width: 38px; height: 38px; }
-    .intro h4 { font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
-    .intro p { margin-top: 6px; font-size: 14px; color: var(--muted); line-height: 1.5; max-width: 260px; }
+    .intro::before, .intro::after {
+      content: ""; position: absolute; border-radius: 50%; pointer-events: none;
+      border: 1px solid rgba(255,255,255,.12);
+    }
+    .intro::before { width: 220px; height: 220px; right: -70px; top: -90px; }
+    .intro::after { width: 140px; height: 140px; right: -20px; top: -40px; }
+    .intro .big {
+      width: 52px; height: 52px; border-radius: 16px; background: #fff; color: var(--accent);
+      display: grid; place-items: center; margin-bottom: 18px; --robot-face: #fff;
+      box-shadow: 0 10px 24px -8px rgba(0,0,0,.45);
+    }
+    .intro .big .robot { width: 32px; height: 32px; }
+    .intro h4 { font-size: 26px; font-weight: 750; letter-spacing: -.035em; line-height: 1.15; }
+    .intro h4 span { display: block; color: rgba(255,255,255,.62); font-weight: 650; }
+    .intro p { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.78); line-height: 1.5; max-width: 300px; }
 
-    .chips { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+    .chips {
+      position: relative; margin-top: -48px; background: #fff; border-radius: 18px; padding: 6px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.05), 0 12px 30px -12px rgba(0,0,0,.25);
+    }
+    .chips-label { padding: 10px 12px 6px; font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .02em; text-transform: uppercase; }
     .chip {
       display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%;
-      text-align: left; border: 1px solid var(--line); background: #fff; color: var(--ink);
-      border-radius: 14px; padding: 12px 14px; font-size: 14px; font-weight: 500; cursor: pointer;
-      transition: border-color .15s, background .15s, transform .15s;
+      text-align: left; border: none; background: transparent; color: var(--ink);
+      border-radius: 12px; padding: 12px 12px; font-size: 14px; font-weight: 550; cursor: pointer;
+      transition: background .15s, transform .15s;
     }
-    .chip svg { color: var(--muted); flex-shrink: 0; transition: transform .15s, color .15s; }
-    .chip:hover { border-color: var(--accent); background: #f3f5ee; }
-    .chip:hover svg { color: var(--accent); transform: translateX(3px); }
+    .chip + .chip { box-shadow: 0 -1px 0 var(--line); }
+    .chip:hover, .chip:hover + .chip { box-shadow: none; }
+    .chip svg { color: var(--accent); flex-shrink: 0; transition: transform .15s; }
+    .chip:hover { background: var(--accent-tint); }
+    .chip:hover svg { transform: translateX(3px); }
     .chip:active { transform: scale(.99); }
 
     .row { display: flex; gap: 8px; align-items: flex-end; animation: pop .28s cubic-bezier(.2,.9,.3,1) both; }
     .row.user { justify-content: flex-end; }
+    .intro + .row { margin-top: 4px; }
     .mini {
       width: 28px; height: 28px; border-radius: 9px; background: var(--accent); color: #fff;
-      display: grid; place-items: center; flex-shrink: 0; --robot-face: var(--accent);
+      display: grid; place-items: center; flex-shrink: 0; --robot-face: var(--accent); margin-bottom: 2px;
     }
+    .row.has-actions .mini { margin-bottom: 26px; }
     .mini .robot { width: 18px; height: 18px; }
     @keyframes pop { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
 
+    .col { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; max-width: 82%; }
+    .user .col { align-items: flex-end; }
     .msg {
-      max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 14.5px; line-height: 1.55;
+      max-width: 100%; padding: 11px 15px; border-radius: 20px; font-size: 14.5px; line-height: 1.55;
       white-space: pre-wrap; overflow-wrap: anywhere;
     }
-    .bot .msg { background: var(--soft); color: var(--ink); border-bottom-left-radius: 6px; }
-    .messages { background: #fafaf8; }
-    .footer, form { background: #fafaf8; }
-    .user .msg { background: var(--accent); color: #fff; border-bottom-right-radius: 6px; }
+    .bot .msg {
+      background: #fff; color: var(--ink); border-bottom-left-radius: 6px;
+      box-shadow: 0 0 0 1px var(--line), 0 1px 2px rgba(0,0,0,.04);
+    }
+    .user .msg {
+      background: linear-gradient(145deg, var(--accent), var(--accent-dark)); color: #fff; border-bottom-right-radius: 6px;
+      box-shadow: 0 6px 16px -8px color-mix(in srgb, var(--accent) 80%, transparent);
+    }
     .msg.error { background: #fff; box-shadow: inset 0 0 0 1px #fca5a5; color: #b91c1c; }
     .msg strong { font-weight: 650; }
-    .msg code { background: rgba(0,0,0,.07); padding: 1px 5px; border-radius: 5px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
-    .msg pre { background: #3a3d37; color: #f5f5f5; padding: 10px 12px; border-radius: 10px; overflow-x: auto; white-space: pre; margin: 6px 0; }
+    .msg code { background: rgba(0,0,0,.06); padding: 1px 5px; border-radius: 5px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+    .msg pre { background: #2b2d29; color: #f5f5f5; padding: 10px 12px; border-radius: 10px; overflow-x: auto; white-space: pre; margin: 6px 0; }
     .msg pre code { background: none; padding: 0; color: inherit; }
-    .msg a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-    .typing { display: flex; gap: 4px; padding: 15px 16px; }
+    .msg a { color: var(--accent); font-weight: 550; text-decoration: underline; text-underline-offset: 2px; }
+    .user .msg a { color: inherit; }
+
+    .actions { display: flex; gap: 2px; margin-top: 4px; padding-left: 4px; opacity: .55; transition: opacity .15s; }
+    .row:hover .actions, .actions:focus-within { opacity: 1; }
+    .copy {
+      display: inline-flex; align-items: center; gap: 5px; border: none; background: transparent; cursor: pointer;
+      color: var(--muted); font-size: 12px; font-weight: 500; padding: 3px 7px; border-radius: 8px;
+      transition: background .15s, color .15s;
+    }
+    .copy:hover { background: rgba(0,0,0,.05); color: var(--ink); }
+    .copy.done { color: var(--accent); }
+
+    .typing { display: flex; gap: 4px; padding: 16px 16px; }
     .typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); animation: bounce 1.2s infinite; }
     .typing span:nth-child(2) { animation-delay: .15s; }
     .typing span:nth-child(3) { animation-delay: .3s; }
-    @keyframes bounce { 0%,60%,100% { transform: translateY(0); opacity: .2; } 30% { transform: translateY(-4px); opacity: .8; } }
+    @keyframes bounce { 0%,60%,100% { transform: translateY(0); opacity: .25; } 30% { transform: translateY(-4px); opacity: .85; } }
 
     /* ---------- Composer ---------- */
-    form { padding: 10px 14px 6px; background: #fff; }
+    form { padding: 12px 14px 4px; background: #fff; border-top: 1px solid var(--line); }
     .composer {
       display: flex; align-items: flex-end; gap: 8px; background: var(--soft);
-      border: 1px solid transparent; border-radius: 24px; padding: 5px 5px 5px 16px;
+      border: 1px solid var(--line); border-radius: 22px; padding: 5px 5px 5px 16px;
       transition: border-color .15s, background .15s, box-shadow .15s;
     }
-    .composer:focus-within { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px rgba(85,107,47,.12); }
+    .composer:focus-within { background: #fff; border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent); }
     textarea {
       flex: 1; resize: none; border: none; outline: none; padding: 9px 0; background: transparent;
       font-size: 14.5px; line-height: 1.4; max-height: 120px; color: var(--ink);
     }
-    textarea::placeholder { color: #a1a1aa; }
+    textarea::placeholder { color: #9a9d95; }
     .send {
       width: 38px; height: 38px; flex-shrink: 0; border: none; border-radius: 50%;
       background: var(--accent); color: #fff; cursor: pointer; display: grid; place-items: center;
-      transition: opacity .15s, transform .15s;
+      transition: opacity .15s, transform .15s, background .15s;
     }
-    .send:hover:not(:disabled) { transform: scale(1.06); }
-    .send:disabled { opacity: .2; cursor: default; }
-    .footer { text-align: center; font-size: 11px; color: #a1a1aa; padding: 4px 0 12px; background: #fff; }
+    .send:hover:not(:disabled) { transform: scale(1.06); background: var(--accent-dark); }
+    .send:disabled { opacity: .25; cursor: default; }
+    .footer { text-align: center; font-size: 11px; color: #a1a49c; padding: 6px 0 10px; background: #fff; }
+    .sources { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); white-space: normal; }
+    .source {
+      display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; color: var(--accent);
+      background: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px;
+    }
+    .source::before { content: "📄"; font-size: 10px; }
 
     /* ---------- Mobile: full-screen sheet ---------- */
     @media ${MOBILE_QUERY} {
@@ -231,15 +284,19 @@
         transition: transform .35s cubic-bezier(.2,.9,.3,1), opacity .2s, visibility 0s .35s;
       }
       .open .panel { transition: transform .35s cubic-bezier(.2,.9,.3,1), opacity .2s; }
-      .header { padding: calc(12px + var(--safe-t)) 10px 12px 16px; }
+      .header { padding: calc(12px + var(--safe-t)) 8px 12px 16px; }
       .icon-btn { width: 42px; height: 42px; }
-      .messages { padding: 18px 14px 10px; }
-      .msg { max-width: 85%; font-size: 15px; }
+      .messages { padding: 0 14px 14px; }
+      .intro { margin: 0 -14px; padding: 20px 22px 56px; }
+      .intro h4 { font-size: 28px; }
+      .msg { font-size: 15px; }
+      .col { max-width: 86%; }
+      .actions { opacity: 1; }
       textarea { font-size: 16px; } /* 16px stops iOS from zooming on focus */
       .send { width: 40px; height: 40px; }
-      form { padding: 8px 12px calc(8px + var(--safe-b)); border-top: 1px solid var(--line); }
+      form { padding: 10px 12px calc(10px + var(--safe-b)); }
       .footer { display: none; }
-      .chip { padding: 14px 16px; font-size: 15px; }
+      .chip { padding: 14px 12px; font-size: 15px; }
     }
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { animation: none !important; transition: none !important; }
@@ -304,6 +361,7 @@
     html = html.replace(/\*\*([^*\n]+)\*\*/g, "<strong>$1</strong>");
     html = html.replace(/(^|[^*])\*([^*\n]+)\*(?!\*)/g, "$1<em>$2</em>");
     html = html.replace(/^\s*[-*] /gm, "• ");
+    html = html.replace(/^\s*(-{3,}|\*{3,})\s*$/gm, "");
     html = html.replace(/\n{3,}/g, "\n\n");
     html = html.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
     return html;
@@ -330,19 +388,52 @@
     const row = document.createElement("div");
     row.className = `row ${role}`;
     if (role === "bot") row.innerHTML = `<div class="mini">${ROBOT_SVG}</div>`;
+    const col = document.createElement("div");
+    col.className = "col";
     const msg = document.createElement("div");
     msg.className = "msg";
     msg.innerHTML = html;
-    row.appendChild(msg);
+    col.appendChild(msg);
+    row.appendChild(col);
     list.appendChild(row);
     scrollDown();
     return row;
   }
 
-  function addBubble(role, text, isError) {
+  function addBubble(role, text, isError, sources) {
     const row = addRow(role, role === "bot" ? renderMarkdown(text) : escapeHtml(text));
     if (isError) row.querySelector(".msg").classList.add("error");
+    if (cfg.showSources && sources?.length) {
+      // Documents the answer was based on (from the knowledge base / RAG).
+      const list = document.createElement("div");
+      list.className = "sources";
+      list.innerHTML = sources.map((s) => `<span class="source">${escapeHtml(s)}</span>`).join("");
+      row.querySelector(".msg").appendChild(list);
+    }
+    if (role === "bot" && !isError) addCopyButton(row, text);
     return row;
+  }
+
+  function addCopyButton(row, text) {
+    const actions = document.createElement("div");
+    actions.className = "actions";
+    actions.innerHTML = `<button class="copy" type="button" aria-label="Copy reply">${ICONS.copy}<span>Copy</span></button>`;
+    const btn = actions.querySelector(".copy");
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        return;
+      }
+      btn.classList.add("done");
+      btn.innerHTML = `${ICONS.check}<span>Copied</span>`;
+      setTimeout(() => {
+        btn.classList.remove("done");
+        btn.innerHTML = `${ICONS.copy}<span>Copy</span>`;
+      }, 1600);
+    });
+    row.classList.add("has-actions");
+    row.querySelector(".col").appendChild(actions);
   }
 
   function renderIntro() {
@@ -350,7 +441,7 @@
     intro.className = "intro";
     intro.innerHTML = `
       <div class="big">${ROBOT_SVG}</div>
-      <h4>Hi, I'm your ${escapeHtml(cfg.title)} 👋</h4>
+      <h4>Hi there 👋<span>How can I help?</span></h4>
       <p>${escapeHtml(cfg.welcome)}</p>`;
     list.appendChild(intro);
   }
@@ -359,6 +450,7 @@
     if (!cfg.suggestions.length) return;
     const chips = document.createElement("div");
     chips.className = "chips";
+    chips.innerHTML = `<div class="chips-label">Suggested</div>`;
     cfg.suggestions.forEach((s) => {
       const b = document.createElement("button");
       b.type = "button";
@@ -374,7 +466,7 @@
     list.innerHTML = "";
     renderIntro();
     if (history.length === 0) renderChips();
-    history.forEach((m) => addBubble(m.role, m.text));
+    history.forEach((m) => addBubble(m.role, m.text, false, m.sources));
   }
 
   function showTyping() {
@@ -405,11 +497,13 @@
       });
       const data = await res.json().catch(() => ({}));
       typing.remove();
-      if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
-      history.push({ role: "bot", text: data.reply });
+      // FastAPI sends errors as {detail: "..."}.
+      const message = data.error || (typeof data.detail === "string" ? data.detail : "");
+      if (!res.ok) throw new Error(message || `Request failed (${res.status})`);
+      history.push({ role: "bot", text: data.reply, sources: data.sources || [] });
       saveHistory();
       // Scroll to the start of the reply so long answers are read from the top.
-      const row = addBubble("bot", data.reply);
+      const row = addBubble("bot", data.reply, false, data.sources);
       list.scrollTop = Math.min(list.scrollHeight, row.offsetTop - 16);
     } catch (err) {
       typing.remove();
@@ -493,6 +587,8 @@
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && wrap.classList.contains("open")) toggle(false);
   });
+  // Shadow under the header once the welcome band scrolls away.
+  list.addEventListener("scroll", () => wrap.classList.toggle("scrolled", list.scrollTop > 8), { passive: true });
   window.visualViewport?.addEventListener("resize", fitToViewport);
   window.visualViewport?.addEventListener("scroll", fitToViewport);
   mobile.addEventListener?.("change", () => {
@@ -505,5 +601,6 @@
 
   renderAll();
   const mount = () => document.body.appendChild(host);
-  document.body ? mount() : document.addEventListener("DOMContentLoaded", mount);
+  if (document.body) mount();
+  else document.addEventListener("DOMContentLoaded", mount);
 })();
